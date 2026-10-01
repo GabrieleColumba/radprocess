@@ -40,7 +40,7 @@ var/
 *.egg
 .venv
 *.lock
-
+pymses*
 chemdisk-token.txt
 
 # Logs and databases #
