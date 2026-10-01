@@ -262,57 +262,84 @@ class Convert:
         # Honour the multi-grain switch. When disabled, ignore any per-bin
         # dust data (ratios / fluids) even if present in the RAMSES output,
         # and fall back to a single dust species with rho_dust = dtogas * rho.
-        if not getattr(sim_param, "use_multi_grain", True):
-            has_ratio = False
+        if getattr(sim_param, "use_multi_grain", False):
+            has_ratio = False       # now this is probably unnecessary
             has_fluids = False
 
-
-        if has_ratio:
-            #IMPORTANT: Here, ramses dumps the total density = rho_g + rho_d in units of mu micron.(so density is not the actual gas density)
-            #for the dust, RAMSES provides dust enrichment (not dust-to-gas mass ratio). So we derive a corretion factor to obtain the dust mass ratios.
-
-            # shape: (cells, species)
-            dust_ratio = np.zeros((nr_of_cells, nb_species), dtype=np.float32)
-            dust_massdensity = np.zeros((nr_of_cells, nb_species), dtype=np.float32)
-
-            # RAMSES gives enrichment; convert to dust/gas
-            epsilon_tot = np.zeros(nr_of_cells, dtype=np.float32)
-
-            enrich = []
-
-            for i in range(1, nb_species + 1):
-                e = cells[f"dust_ratio_{i}"]
-                enrich.append(e)
-                epsilon_tot += e
-
-            correction_factor = 1.0 - epsilon_tot
-            output["gas_massdensity"] = mp * correction_factor * cells["density"]
-
-            for i, e in enumerate(enrich):
-                dust_ratio[:, i] = e / correction_factor
-
-
-            for i in range(0, nb_species):
-                dust_massdensity[:, i] = dust_ratio[:, i]*output["gas_massdensity"]
-
-            output['dust_massdensities'] = dust_massdensity
-            output['dust_massdensity']  = np.sum(dust_massdensity, axis=1)
-            
-        if has_fluids:
-            fluid_density = np.zeros((nr_of_cells, nb_species), dtype=np.float32)
-
-            for i in range(0, nb_species):
-                fluid_density[:, i] = fluid_cells[f"fluid_density_{i+1}"] * mp
-
-            output["dust_massdensities"] = fluid_density
-            output['dust_massdensity']  = np.sum(fluid_density, axis=1)
-            output["gas_massdensity"]  = cells["density"]*mp
-            
-
-        if not has_ratio and not has_fluids:
+            # this was the original upstream implementation to fall back on a single dust fluid
             output["gas_massdensity"]  = cells["density"] * mp # in unit of RAMSES here
             output['dust_massdensity'] = cells["density"] * mp * sim_param.dtogas
-        
+
+        else:       # if  multi_grain == True
+
+            if has_ratio:       # use actual simulation's fluids and ratios
+                #IMPORTANT: Here, ramses dumps the total density = rho_g + rho_d in units of mu micron.(so density is not the actual gas density)
+                #for the dust, RAMSES provides dust enrichment (not dust-to-gas mass ratio). So we derive a corretion factor to obtain the dust mass ratios.
+
+                # shape: (cells, species)
+                dust_ratio = np.zeros((nr_of_cells, nb_species), dtype=np.float32)
+                dust_massdensity = np.zeros((nr_of_cells, nb_species), dtype=np.float32)
+
+                # RAMSES gives enrichment; convert to dust/gas
+                epsilon_tot = np.zeros(nr_of_cells, dtype=np.float32)
+                enrich = []
+
+                for i in range(1, nb_species + 1):
+                    e = cells[f"dust_ratio_{i}"]
+                    enrich.append(e)
+                    epsilon_tot += e
+
+                correction_factor = 1.0 - epsilon_tot
+                output["gas_massdensity"] = mp * correction_factor * cells["density"]
+
+                for i, e in enumerate(enrich):
+                    dust_ratio[:, i] = e / correction_factor
+
+
+                for i in range(0, nb_species):
+                    dust_massdensity[:, i] = dust_ratio[:, i]*output["gas_massdensity"]
+
+                output['dust_massdensities'] = dust_massdensity
+                output['dust_massdensity']  = np.sum(dust_massdensity, axis=1)
+                
+            if has_fluids:
+                fluid_density = np.zeros((nr_of_cells, nb_species), dtype=np.float32)
+
+                for i in range(0, nb_species):
+                    fluid_density[:, i] = fluid_cells[f"fluid_density_{i+1}"] * mp
+
+                output["dust_massdensities"] = fluid_density
+                output['dust_massdensity']  = np.sum(fluid_density, axis=1)
+                output["gas_massdensity"]  = cells["density"]*mp
+            
+            elif has_ratio or has_fluids:
+                raise Exception( 'Trying to read dust densities and ratios from ramses but failed. ')
+
+
+            if not has_ratio and not has_fluids:        # ASSUME arbitrary dust ratios and densities (not simulated in ramses)
+
+                dust_ratio = np.zeros((nr_of_cells, nb_species), dtype=np.float32)          # shape: (cells, species)
+                dust_massdensity = np.zeros((nr_of_cells, nb_species), dtype=np.float32)
+                epsilon_tot = np.zeros(nr_of_cells, dtype=np.float32)       # RAMSES gives enrichment; convert to dust/gas
+                enrich = []
+                d_ratios = np.array([0.1, 0.1, 0.2, 0.3, 0.3]) / 100        # temp dust ratios array
+
+                epsilon_tot += np.sum( d_ratios )
+                correction_factor = 1.0 - epsilon_tot
+
+                output["gas_massdensity"] = mp * correction_factor * cells["density"]
+
+                for i in range(0, nb_species):
+                    dust_ratio[:, i] = d_ratios[i]      # no need for correction like ramses ratios since I defined them already relative to gas
+                    dust_massdensity[:, i] = dust_ratio[:, i] * output["gas_massdensity"]
+
+                output['dust_massdensities'] = dust_massdensity
+                output['dust_massdensity'] = np.sum( dust_massdensity, axis=1)
+
+
+
+
+            
  
         #---VELOCITY SECTION:---
         if has_velocity:
