@@ -42,7 +42,29 @@ dustmix = {		# sacha example
 			'amax': 1.0e-04, 	# in m
 			'index': -3.5 		# MRN
 		},
-}
+},}
+
+def create_mixtures( nbin, a_min, a_max, fractions, slope=-3.5, comp_path):
+	'''
+	Create a dictionary of dust mixtures with the desired nbin
+	'''
+	mix = {}
+	a_array = np.logspace( np.log10(a_min), np.log10(a_max), nbin, endpoint=True )
+
+	for i in range(nbin):
+		for c in range(comp_path):
+			mix[ i ] = { c : {
+				'path': comp_path[c],
+				'distribution': 'plaw', 	# power-law size distribution
+				'fraction': .8, 			# mass fraction 
+				'density': 0, 				# using the default density defined in the dust model file
+				'amin': a_array[ i], 		# in m
+				'amax': a_array[ i+1], 		# in m
+				'index': slope, 			# exponent of size distribution
+					}
+				}
+
+	return mix
 
 cfg.dust.mixtures = dustmix
 

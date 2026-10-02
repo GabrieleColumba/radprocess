@@ -263,11 +263,12 @@ class Convert:
         # dust data (ratios / fluids) even if present in the RAMSES output,
         # and fall back to a single dust species with rho_dust = dtogas * rho.
         if getattr(sim_param, "use_multi_grain", False):
+            print('multigrain: False')
             has_ratio = False       # now this is probably unnecessary
             has_fluids = False
 
             # this was the original upstream implementation to fall back on a single dust fluid
-            output["gas_massdensity"]  = cells["density"] * mp # in unit of RAMSES here
+            output["gas_massdensity"]  = cells["density"] * mp      # in unit of RAMSES here
             output['dust_massdensity'] = cells["density"] * mp * sim_param.dtogas
 
         else:       # if  multi_grain == True
@@ -312,12 +313,15 @@ class Convert:
                 output['dust_massdensity']  = np.sum(fluid_density, axis=1)
                 output["gas_massdensity"]  = cells["density"]*mp
             
-            elif has_ratio or has_fluids:
-                raise Exception( 'Trying to read dust densities and ratios from ramses but failed. ')
+            # if has_ratio or has_fluids:
+            #     raise Exception( 'Trying to read dust densities and ratios from ramses but failed. ')
 
 
             if not has_ratio and not has_fluids:        # ASSUME arbitrary dust ratios and densities (not simulated in ramses)
-
+                print( '\n', 'Adding artificial dust bins to sim data !')
+                has_ratio = False
+                has_fluids = True
+                
                 dust_ratio = np.zeros((nr_of_cells, nb_species), dtype=np.float32)          # shape: (cells, species)
                 dust_massdensity = np.zeros((nr_of_cells, nb_species), dtype=np.float32)
                 epsilon_tot = np.zeros(nr_of_cells, dtype=np.float32)       # RAMSES gives enrichment; convert to dust/gas
@@ -325,7 +329,7 @@ class Convert:
                 d_ratios = np.array([0.1, 0.1, 0.2, 0.3, 0.3]) / 100        # temp dust ratios array
 
                 epsilon_tot += np.sum( d_ratios )
-                correction_factor = 1.0 - epsilon_tot
+                correction_factor = 1.0 - epsilon_tot       # adjust gass mass to sum to total together with injected dust
 
                 output["gas_massdensity"] = mp * correction_factor * cells["density"]
 
