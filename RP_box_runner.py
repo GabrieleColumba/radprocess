@@ -12,8 +12,9 @@ views = ['xy']
 pipe = Pipeline()
 cfg = pipe.configparams          # a ConfigParams instance
 cfg.polaris.nr_threads = 28
-cfg.dir.ramses_output = 'run/ramses_data/output_01440/'
-cfg.dir.pipeline_output = "run/results/test/"
+archive_prefix = '/scratch/astro/gabriele.columba/'
+cfg.dir.ramses_output = archive_prefix + 'ramses_data/output_01440/'
+cfg.dir.pipeline_output = archive_prefix + "results/test/"
 
 
 
