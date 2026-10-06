@@ -2,11 +2,39 @@
 
 from radprocess.pipeline.Pipeline import Pipeline
 from radprocess.plotting import plot
+import numpy as np
 
 #sinks_IDs = [65]  	# List of sink IDs to extract subboxes for
 id = 53
 box_fov = 1000  		# diameter of the subbox in AU
 views = ['xy']
+
+
+def create_mixtures( nbin, a_min=1e-8, a_max=2e-3, fractions=[0.8], slope=-3.5, components=['silicate_d03.nk'] ):
+	'''
+	Create a dictionary of dust mixtures with the desired nbin. 
+	fraction: list of mass fractions for each component in the mixture (same len as components).
+	components: list of different dust species opacities (nk files) to be used in each mixtures. 
+	'''
+	mix = {}
+	a_grid = np.logspace( np.log10(a_min), np.log10(a_max), nbin + 1, endpoint=True, dtype=np.float32 )
+	comp_dir = '/home/PERSONALE/gabriele.columba/POLARIS/input/dust_nk/'	# directory containing the dust opacity files
+	
+	for i in range(nbin):		# iterate on mixtures
+		for c in range(len(components)):		# iterate on components
+			mix[ i ] = { c : {		
+				'path': comp_dir + components[c],
+				'distribution': 'plaw', 	# power-law size distribution
+				'fraction': fractions[c], 	# mass fraction 
+				'density': 0, 				# using the default density defined in the dust model file
+				'amin': a_grid[ i], 		# in [m]
+				'amax': a_grid[ i+1], 		# in [m]
+				'index': slope, 			# exponent of size distribution
+					}
+				}
+	
+	return mix
+
 
 pipe = Pipeline()
 cfg = pipe.configparams          # a ConfigParams instance
@@ -31,40 +59,20 @@ cfg.nb_dust = 5		# number of dust species IN MHD SIM !
 
 # # Dust materials.    [either the refractive index tables (.nk files) or the cross-sections (*.dat files) in the POLARIS format]
 
-dustmix = {		# sacha example
-	0: { # mixture ID (1st mixture)
-		0: { # component ID (1st component)
-			'path': '/home/PERSONALE/gabriele.columba/POLARIS/input/dust_nk/silicate_d03.nk',
-			'distribution': 'plaw', # power-law size distribution
-			'fraction': .8, 	# 60% mass fraction of 1st mixture
-			'density': 0, 		# using the default density defined in the dust model file
-			'amin': 1.0e-08, 	# in m
-			'amax': 1.0e-04, 	# in m
-			'index': -3.5 		# MRN
-		},
-},}
+# dustmix = {		# sacha example
+# 	0: { # mixture ID (1st mixture)
+# 		0: { # component ID (1st component)
+# 			'path': '/home/PERSONALE/gabriele.columba/POLARIS/input/dust_nk/silicate_d03.nk',
+# 			'distribution': 'plaw', # power-law size distribution
+# 			'fraction': .8, 	# 60% mass fraction of 1st mixture
+# 			'density': 0, 		# using the default density defined in the dust model file
+# 			'amin': 1.0e-08, 	# in m
+# 			'amax': 1.0e-04, 	# in m
+# 			'index': -3.5 		# MRN
+# 		},
+# },}
 
-def create_mixtures( nbin, a_min, a_max, fractions, slope=-3.5, comp_path):
-	'''
-	Create a dictionary of dust mixtures with the desired nbin
-	'''
-	mix = {}
-	a_array = np.logspace( np.log10(a_min), np.log10(a_max), nbin, endpoint=True )
-
-	for i in range(nbin):
-		for c in range(comp_path):
-			mix[ i ] = { c : {
-				'path': comp_path[c],
-				'distribution': 'plaw', 	# power-law size distribution
-				'fraction': .8, 			# mass fraction 
-				'density': 0, 				# using the default density defined in the dust model file
-				'amin': a_array[ i], 		# in m
-				'amax': a_array[ i+1], 		# in m
-				'index': slope, 			# exponent of size distribution
-					}
-				}
-
-	return mix
+dustmix = create_mixtures( nbin=cfg.nb_dust, a_min=1e-8, a_max=2e-3, fractions=[0.8], slope=-3.5, components=['silicate_d03.nk'] )
 
 cfg.dust.mixtures = dustmix
 
@@ -98,7 +106,7 @@ pipe.run_polaris_opacity( dust_mixtures=dustmix )
 
 pipe.prepare_radmc3d_inputs(
 	subbox=True,
-	nphot=0.5e6,              # thermal 
+	nphot=0.5e6,            # thermal 
 	nphot_scat=1e6,	        # scattering	
 	n_wavelengths=200,      # 200 default 
 	wave_min=0.27,          # µm (match the dustkappa range)
@@ -175,36 +183,36 @@ for view in views:
 
 # # Dust materials.    [either the refractive index tables (.nk files) or the cross-sections (*.dat files) in the POLARIS format]
 
-dustmix = {		# sacha example
-	0: { # mixture ID (1st mixture)
-		0: { # component ID (1st component)
-			'path': '/home/PERSONALE/gabriele.columba/POLARIS/input/dust_nk/silicate_d03.nk',
-			'distribution': 'plaw', # power-law size distribution
-			'fraction': .8, 	# 60% mass fraction of 1st mixture
-			'density': 0, 		# using the default density defined in the dust model file
-			'amin': 1.0e-08, 	# in m
-			'amax': 1.0e-04, 	# in m
-			'index': -3.5 		# MRN
-		},
-	# 	1 :{ # component ID (2nd component)
-	# 		'path': '/home/PERSONALE/gabriele.columba/POLARIS/input/dust_nk/organics_p94.nk',
-	# 		'distribution': 'plaw', # MUST be the same for all components within a single mixture
-	# 		'fraction': 0.4, # 40% mass fraction of 1st mixture (the total should be 1)
-	# 		'density': 0,
-	# 		'amin': 5.0e-08,
-	# 		'amax': 5.0e-06,
-	# 		'index': -3.0
-	# 	}
-	# },
-	# 1: { # mixture ID (only if the number of dust density distribution columns is greater than 1)
-	# 	0: { # component ID (a single component)
-	# 		'path': '/home/PERSONALE/gabriele.columba/POLARIS/input/dust_nk/silicate_d03.nk',
-	# 		'distribution': 'logn', # log-normal size distribution
-	# 		'fraction': 1.0, # 100% mass fraction of 2nd mixture
-	# 		'density': 3300, # kg/m^3
-	# 		'amin': 1.0e-08,
-	# 		'amax': 1.0e-06,
-	# 		'index': [1.0e-07, 0.5]
-	# 	}
-	}
-}
+# dustmix = {		# sacha example
+# 	0: { # mixture ID (1st mixture)
+# 		0: { # component ID (1st component)
+# 			'path': '/home/PERSONALE/gabriele.columba/POLARIS/input/dust_nk/silicate_d03.nk',
+# 			'distribution': 'plaw', # power-law size distribution
+# 			'fraction': .8, 	# 60% mass fraction of 1st mixture
+# 			'density': 0, 		# using the default density defined in the dust model file
+# 			'amin': 1.0e-08, 	# in m
+# 			'amax': 1.0e-04, 	# in m
+# 			'index': -3.5 		# MRN
+# 		},
+# 	# 	1 :{ # component ID (2nd component)
+# 	# 		'path': '/home/PERSONALE/gabriele.columba/POLARIS/input/dust_nk/organics_p94.nk',
+# 	# 		'distribution': 'plaw', # MUST be the same for all components within a single mixture
+# 	# 		'fraction': 0.4, # 40% mass fraction of 1st mixture (the total should be 1)
+# 	# 		'density': 0,
+# 	# 		'amin': 5.0e-08,
+# 	# 		'amax': 5.0e-06,
+# 	# 		'index': -3.0
+# 	# 	}
+# 	# },
+# 	# 1: { # mixture ID (only if the number of dust density distribution columns is greater than 1)
+# 	# 	0: { # component ID (a single component)
+# 	# 		'path': '/home/PERSONALE/gabriele.columba/POLARIS/input/dust_nk/silicate_d03.nk',
+# 	# 		'distribution': 'logn', # log-normal size distribution
+# 	# 		'fraction': 1.0, # 100% mass fraction of 2nd mixture
+# 	# 		'density': 3300, # kg/m^3
+# 	# 		'amin': 1.0e-08,
+# 	# 		'amax': 1.0e-06,
+# 	# 		'index': [1.0e-07, 0.5]
+# 	# 	}
+# 	}
+# }
