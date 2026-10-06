@@ -9,6 +9,13 @@ id = 53
 box_fov = 1000  		# diameter of the subbox in AU
 views = ['xy']
 
+pipe = Pipeline()
+cfg = pipe.configparams          # a ConfigParams instance
+cfg.polaris.nr_threads = 28
+cfg.dir.ramses_output = 'run/ramses_data/output_01440/'
+cfg.dir.pipeline_output = "run/results/test/"
+
+
 
 def create_mixtures( nbin, a_min=1e-8, a_max=2e-3, fractions=[0.8], slope=-3.5, components=['silicate_d03.nk'] ):
 	'''
@@ -36,12 +43,6 @@ def create_mixtures( nbin, a_min=1e-8, a_max=2e-3, fractions=[0.8], slope=-3.5, 
 	return mix
 
 
-pipe = Pipeline()
-cfg = pipe.configparams          # a ConfigParams instance
-cfg.polaris.nr_threads = 28
-cfg.dir.ramses_output = 'run/ramses_data/output_01440/'
-cfg.dir.pipeline_output = "run/results/test/"
-
 # Define the AMR fields you want to extract
 cfg.amrsource.rho = True
 cfg.amrsource.dustratios = False
@@ -54,7 +55,7 @@ cfg.sim.size_hole_au = 4.0
 cfg.sim.facc = 0.1
 # cfg.sim.use_ramses_T = False
 cfg.sim.dtogas = 0.01		# dust to gas ratio
-cfg.nb_dust = 5		# number of dust species IN MHD SIM !
+cfg.nb_dust = 1		# number of dust species IN MHD SIM !
 
 
 # # Dust materials.    [either the refractive index tables (.nk files) or the cross-sections (*.dat files) in the POLARIS format]
