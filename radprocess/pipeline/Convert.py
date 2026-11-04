@@ -320,13 +320,13 @@ class Convert:
             if not has_ratio and not has_fluids:        # ASSUME arbitrary dust ratios and densities (not simulated in ramses)
                 print( '\n', 'Adding artificial dust bins to sim data !')
                 has_ratio = False
-                has_fluids = True
+                has_fluids = True       # we create them
                 
                 dust_ratio = np.zeros((nr_of_cells, nb_species), dtype=np.float32)          # shape: (cells, species)
                 dust_massdensity = np.zeros((nr_of_cells, nb_species), dtype=np.float32)
                 epsilon_tot = np.zeros(nr_of_cells, dtype=np.float32)       # RAMSES gives enrichment; convert to dust/gas
                 enrich = []
-                d_ratios = np.array([0.1, 0.1, 0.2, 0.3, 0.3]) / 100        # temp dust ratios array
+                d_ratios = np.array([0.1, 0.1, 0.2, 0.3, 0.3]) / 100        # temp dust ratios array TODO: adjust for desired nbins
 
                 epsilon_tot += np.sum( d_ratios )
                 correction_factor = 1.0 - epsilon_tot       # adjust gass mass to sum to total together with injected dust
