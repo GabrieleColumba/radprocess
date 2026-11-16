@@ -7,7 +7,8 @@ import numpy as np
 
 id = 50
 wles_obs = [0.890, 3.00]		# [mm]
-main_beam = np.rad2deg( 1.13 * wles_obs.max()*1e-3 / 12	)		# [deg], main beam for ALMA 12m antenna
+npixs = [2420, 1630]			# number of pixels for each wavelength
+main_beam = np.rad2deg( 1.13 * max( wles_obs)*1e-3 / 12	)		# [deg], main beam for ALMA 12m antenna
 box_fov = main_beam * 140 * 3600		# [AU], box fov to match the main beam at 140 pc
 # box_fov = 1000  		# diameter of the subbox in AU
 views = ['xy']
@@ -116,7 +117,7 @@ pipe.prepare_radmc3d_inputs(
 	nphot=1e6,            # thermal 
 	nphot_scat=1e6,	        # scattering	
 	n_wavelengths=200,      # 200 default 
-	wave_min=0.2,          # µm (match the dustkappa range)
+	wave_min=0.1,          # µm (match the dustkappa range)
 	wave_max=30e3,          # µm
 	scattering_mode=1,  	# 0: no scattering, 1: isotropic, 2: anisotropic, 3: full scattering (no polarisation)
 	scattering_mode_max=1,
@@ -133,16 +134,31 @@ pipe.merge_temperature( subbox=f'sink_{id :04d}' )
 # It should match the box_au used for the RADMC-3D regrid so that density and intensity maps are directly comparable. 
 # The image is automatically centered on the sink via the POLARIS detector shift.
 
+for i in range(len(wles_obs)):
+
+	pipe.render_images(
+		dust_mixtures= dustmix,
+		npix= npixs[i],
+		distance_pc= 140.0,
+		wavelengths_mm= [wles_obs[i]],
+		views= views,
+		subbox=[ f'sink_{id :04d}'],
+		fov_au= box_fov,     	# diameter
+		polaris_binary= '/home/PERSONALE/gabriele.columba/POLARIS/bin/polaris',
+		#cleanup_views= True	# ??? 
+	)
+	
 pipe.render_images(
-	dust_mixtures=dustmix,
-	npix=512,
-	distance_pc=140.0,
-	wavelengths_mm= wles_obs,
+	dust_mixtures= dustmix,
+	npix= npixs[1],
+	distance_pc= 140.0,
+	wavelengths_mm= [wles_obs[1]],
 	views= views,
-	subbox=[f'sink_{id :04d}'],
+	subbox=[ f'sink_{id :04d}'],
 	fov_au= box_fov,     	# diameter
 	polaris_binary= '/home/PERSONALE/gabriele.columba/POLARIS/bin/polaris',
-	#cleanup_views= True	# ??? 
+	write_midplanes= False,
+	cleanup_views= True	# ??? 
 )
 
 
