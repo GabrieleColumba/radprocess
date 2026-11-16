@@ -60,5 +60,6 @@ ehthumbs.db
 Thumbs.db
 
 
-### local paths file
+### local files
 local_variables.py
+comparison.py
