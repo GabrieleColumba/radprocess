@@ -4,9 +4,12 @@ from radprocess.pipeline.Pipeline import Pipeline
 from radprocess.plotting import plot
 import numpy as np
 
-#sinks_IDs = [65]  	# List of sink IDs to extract subboxes for
-id = 17
-box_fov = 1000  		# diameter of the subbox in AU
+
+id = 50
+wles_obs = [0.890, 3.00]		# [mm]
+main_beam = np.rad2deg( 1.13 * wles_obs.max()*1e-3 / 12	)		# [deg], main beam for ALMA 12m antenna
+box_fov = main_beam * 140 * 3600		# [AU], box fov to match the main beam at 140 pc
+# box_fov = 1000  		# diameter of the subbox in AU
 views = ['xy']
 
 pipe = Pipeline()
@@ -14,7 +17,7 @@ cfg = pipe.configparams          # a ConfigParams instance
 cfg.polaris.nr_threads = 28
 archive_prefix = '/scratch/astro/gabriele.columba/'
 cfg.dir.ramses_output = archive_prefix + 'ramses_data/output_01440/'
-cfg.dir.pipeline_output = archive_prefix + "results/test/"
+cfg.dir.pipeline_output = archive_prefix + "results/validation/"
 
 
 
@@ -26,7 +29,9 @@ def create_mixtures( nbin, a_min=1e-8, a_max=2e-3, fractions=[0.8, 0.1], slope=-
 	'''
 	mix = {}
 	a_grid = np.logspace( np.log10(a_min), np.log10(a_max), nbin + 1, endpoint=True, dtype=np.float32 )
-	comp_dir = '/home/PERSONALE/gabriele.columba/POLARIS/input/dust_nk/'	# directory containing the dust opacity files
+	comp_dir = '/scratch/astro/gabriele.columba/' 	# validation with tungs
+	# comp_dir = '/home/PERSONALE/gabriele.columba/POLARIS/input/dust_nk/'	# directory containing the dust opacity files
+
 	
 	for i in range(nbin):		# iterate on mixtures
 		mix[i] = {}
@@ -51,11 +56,11 @@ cfg.amrsource.p = True         # pressure (optional)
 cfg.amrsource.temp = True      # temperature (requires pressure)
 
 # Simulation parameters
-cfg.sim.size_hole_au = 4.0
+cfg.sim.size_hole_au = 2.0
 cfg.sim.facc = 0.1
 # cfg.sim.use_ramses_T = False
 cfg.sim.dtogas = 0.01		# dust to gas ratio
-cfg.nb_dust = 3		# number of dust species you want !
+cfg.nb_dust = 1		# number of dust species you want !
 
 
 # # Dust materials.    [either the refractive index tables (.nk files) or the cross-sections (*.dat files) in the POLARIS format]
@@ -73,8 +78,8 @@ cfg.nb_dust = 3		# number of dust species you want !
 # 		},
 # },}
 
-dustmix = create_mixtures( nbin=cfg.nb_dust, a_min=1e-8, a_max=2e-3, fractions=[0.8, 0.1], slope=-3.5, 
-                          components=['silicate_d03.nk', 'organics_p94.nk'] )
+dustmix = create_mixtures( nbin=cfg.nb_dust, a_min=1e-9, a_max=1e-5, fractions=[1], slope=-3.5, 
+                          components=['DIANA-dhs_w16.dat'] )
 
 cfg.dust.mixtures = dustmix
 
@@ -98,7 +103,7 @@ pipe.convert_subboxes(
 # RADMC-3D format (same extraction, different output format)
 pipe.convert_subboxes(
 	which_rad="radmc",
-	box_half_width_au=box_fov/2,
+	box_half_width_au= box_fov/2,
 	sink_indices= [id-1],
 )
 
@@ -108,10 +113,10 @@ pipe.run_polaris_opacity( dust_mixtures=dustmix, mass_fraction=0.01 , n_dust_ove
 
 pipe.prepare_radmc3d_inputs(
 	subbox=True,
-	nphot=0.5e6,            # thermal 
+	nphot=1e6,            # thermal 
 	nphot_scat=1e6,	        # scattering	
 	n_wavelengths=200,      # 200 default 
-	wave_min=0.27,          # µm (match the dustkappa range)
+	wave_min=0.2,          # µm (match the dustkappa range)
 	wave_max=30e3,          # µm
 	scattering_mode=1,  	# 0: no scattering, 1: isotropic, 2: anisotropic, 3: full scattering (no polarisation)
 	scattering_mode_max=1,
@@ -132,10 +137,10 @@ pipe.render_images(
 	dust_mixtures=dustmix,
 	npix=512,
 	distance_pc=140.0,
-	wavelengths_mm=[3],
+	wavelengths_mm= wles_obs,
 	views= views,
 	subbox=[f'sink_{id :04d}'],
-	fov_au=box_fov,     	# diameter
+	fov_au= box_fov,     	# diameter
 	polaris_binary= '/home/PERSONALE/gabriele.columba/POLARIS/bin/polaris',
 	#cleanup_views= True	# ??? 
 )

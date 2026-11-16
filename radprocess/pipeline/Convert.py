@@ -264,8 +264,6 @@ class Convert:
         # and fall back to a single dust species with rho_dust = dtogas * rho.
         if getattr(sim_param, "use_multi_grain", True) == False:
             print('multigrain: False')
-            has_ratio = False       # now this is probably unnecessary
-            has_fluids = False
 
             # this was the original upstream implementation to fall back on a single dust fluid
             output["gas_massdensity"]  = cells["density"] * mp      # in unit of RAMSES here
@@ -320,13 +318,13 @@ class Convert:
             if not has_ratio and not has_fluids:        # ASSUME arbitrary dust ratios and densities (not simulated in ramses)
                 print( '\n', 'Adding artificial dust bins to sim data !')
                 has_ratio = False
-                has_fluids = True       # we create them
+                has_fluids = True       # WE create them now
                 
                 dust_ratio = np.zeros((nr_of_cells, nb_species), dtype=np.float32)          # shape: (cells, species)
                 dust_massdensity = np.zeros((nr_of_cells, nb_species), dtype=np.float32)
                 epsilon_tot = np.zeros(nr_of_cells, dtype=np.float32)       # RAMSES gives enrichment; convert to dust/gas
                 enrich = []
-                d_ratios = np.array([0.1, 0.1, 0.2, 0.3, 0.3]) / 100        # temp dust ratios array TODO: adjust for desired nbins
+                d_ratios = np.array([1]) / 100        # temp dust ratios array TODO: adjust for desired nbins
 
                 epsilon_tot += np.sum( d_ratios )
                 correction_factor = 1.0 - epsilon_tot       # adjust gass mass to sum to total together with injected dust
