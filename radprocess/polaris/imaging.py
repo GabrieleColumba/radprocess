@@ -66,6 +66,7 @@ def write_imaging_cmd(
     nr_threads = 1,
     fov_m = None,
     polaris_cmd = "CMD_DUST_EMISSION",
+    write_midplanes = True, 
     alignment = "ALIG_PA",
     peel_off = True,
     acceptance_angle = None,
@@ -74,7 +75,6 @@ def write_imaging_cmd(
     scat_source_radius_rsun = 1.0,
     scat_source_temp_k = 5000.0,
     detector_shift_m = None,
-    write_midplanes = True,
 ):
     """
     Write a POLARIS command file for dust continuum imaging at a
@@ -239,9 +239,11 @@ def write_imaging_cmd(
                 )
 
         plane_id = view_details["plane_id"]
-        if write_midplanes:
+        if write_midplanes: 
             f.write(f"\n\t<write_inp_midplanes> {npix}")
             f.write(f"\n\t<write_3d_midplanes> {plane_id} {npix}\n")
+        else: 
+            print( '\nSkipping writing of midplane slices to fits files \n')
 
         # f.write(f"\n\t<midplane_zoom> {midplane_zoom}\n")
 
@@ -322,6 +324,7 @@ def render_images(
     label = "whole",
     cleanup_views = True,
     polaris_cmd = "CMD_DUST_EMISSION",
+    write_midplanes = True, 
     alignment = "ALIG_PA",
     peel_off = True,
     acceptance_angle = None,
@@ -445,7 +448,8 @@ def render_images(
             wavelengths_mm = wavelengths_mm,
             nr_threads = nr_threads,
             fov_m = fov_m,
-            polaris_cmd = polaris_cmd,
+            polaris_cmd = polaris_cmd, 
+            write_midplanes = write_midplanes, 
             alignment = alignment,
             peel_off = peel_off,
             acceptance_angle = acceptance_angle,

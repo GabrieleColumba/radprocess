@@ -1283,6 +1283,7 @@ class Pipeline:
                 label = label,
                 cleanup_views = cleanup_views,
                 polaris_cmd = polaris_cmd,
+                write_midplanes = write_midplanes, 
                 alignment = alignment,
                 peel_off = peel_off,
                 acceptance_angle = acceptance_angle,
@@ -1290,7 +1291,6 @@ class Pipeline:
                 source_star_scat = source_star_scat,
                 scat_source_radius_rsun = scat_source_radius_rsun,
                 scat_source_temp_k = scat_source_temp_k,
-                write_midplanes = write_midplanes,
             )
 
         # ---- Subbox case ----
@@ -1385,6 +1385,7 @@ class Pipeline:
                 label = label,
                 cleanup_views = cleanup_views,
                 polaris_cmd = polaris_cmd,
+                write_midplanes = write_midplanes, 
                 alignment = alignment,
                 peel_off = peel_off,
                 acceptance_angle = acceptance_angle,
