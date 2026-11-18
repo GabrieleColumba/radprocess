@@ -265,7 +265,7 @@ class Convert:
         if getattr(sim_param, "use_multi_grain", True) == False:
             print('multigrain: False')
 
-            # this was the original upstream implementation to fall back on a single dust fluid
+            # this was the original upstream implementation to fall back on a single arbitrary dust fluid
             output["gas_massdensity"]  = cells["density"] * mp      # in unit of RAMSES here
             output['dust_massdensity'] = cells["density"] * mp * sim_param.dtogas
 
@@ -324,7 +324,7 @@ class Convert:
                 dust_massdensity = np.zeros((nr_of_cells, nb_species), dtype=np.float32)
                 epsilon_tot = np.zeros(nr_of_cells, dtype=np.float32)       # RAMSES gives enrichment; convert to dust/gas
                 enrich = []
-                d_ratios = np.array([1]) / 100        # temp dust ratios array TODO: adjust for desired nbins
+                d_ratios = np.array([ sim_param.arb_dtogas ])         # temp dust ratios array TODO: adjust for desired nbins
 
                 epsilon_tot += np.sum( d_ratios )
                 correction_factor = 1.0 - epsilon_tot       # adjust gass mass to sum to total together with injected dust
