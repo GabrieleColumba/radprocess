@@ -7,13 +7,13 @@ import numpy as np
 
 id = 50
 wles_obs = [0.890, 3.0]		# [mm]
-npixs = [2420, 1630]		# number of pixels for each wavelength
+npixs = [2420, 1630]		# number of pixels for each wavelength (to match Tung+24 pixelscales)
 main_beam = np.rad2deg( 1.13 * np.array( wles_obs)*1e-3 / 12	)		# [deg], main beam for ALMA 12m antenna
 box_fov = main_beam * 140 * 3600		# [AU], fov to match the main beam at 140 pc
 # box_fov = 1000  		# diameter of the subbox in AU
 views = ['xy']
-scat_phot = 1e6
-therm_phot = 1e6
+scat_phot = int(1e6)
+therm_phot = int(0.5e6)
 
 pipe = Pipeline()
 cfg = pipe.configparams          # a ConfigParams instance
@@ -29,7 +29,7 @@ def create_mixtures( nbin, a_min=1e-8, a_max=2e-3, fractions=[0.8, 0.1], slope=-
 	'''
 	Create a dictionary of dust mixtures with the desired nbin. 
 	fraction: list of mass fractions for each component in the mixture (same len as components).
-	components: list of different dust species opacities (nk files) to be used in each mixtures. 
+	components: list of different dust species opacities to be used in each mixtures. 
 	'''
 	mix = {}
 	a_grid = np.logspace( np.log10(a_min), np.log10(a_max), nbin + 1, endpoint=True, dtype=np.float32 )
@@ -59,12 +59,11 @@ cfg.amrsource.p = True         # pressure (optional)
 cfg.amrsource.temp = True      # temperature (requires pressure)
 
 # Simulation parameters
-cfg.sim.size_hole_au = 2.0
+cfg.sim.size_hole_au = 3.0
 cfg.sim.facc = 0.1
 # cfg.sim.use_ramses_T = False
-cfg.sim.dtogas = 0.01		# dust to gas ratio
+cfg.sim.dtogas = 0.01			# dust to gas ratio (if multi-grain=False, maybe deprecable)
 cfg.nb_dust = 1		# number of dust species you want !
-
 
 # # Dust materials.    [either the refractive index tables (.nk files) or the cross-sections (*.dat files) in the POLARIS format]
 
@@ -72,6 +71,8 @@ dustmix = create_mixtures( nbin=cfg.nb_dust, a_min=1e-9, a_max=1e-5, fractions=[
                           components=['DIANA-dhs_w16.dat'] )
 
 cfg.dust.mixtures = dustmix
+cfg.sim.arb_dtogas = [0.01]		# ratios for each dust species (only used if multi-grain=True and no dust exists in RAMSES output)
+# arb_dtogas must have same length as nb_dust !
 
 # Load RAMSES (Step 1, same as basic pipeline)
 pipe.load_ramses()      # CANNOT be skipped if injecting ad hoc dust bins !
@@ -123,32 +124,23 @@ pipe.merge_temperature( subbox=f'sink_{id :04d}' )
 # It should match the box_au used for the RADMC-3D regrid so that density and intensity maps are directly comparable. 
 # The image is automatically centered on the sink via the POLARIS detector shift.
 
-# for i in range(len(wles_obs)):	# bisogna cambiare il nome dell'output polaris per ogni wavelength, altrimenti sovrascrive il file di output
+for i in range(len(wles_obs)):	# bisogna cambiare il nome dell'output polaris per ogni wavelength, altrimenti sovrascrive il file di output
 
-# 	pipe.render_images(
-# 		dust_mixtures= dustmix,
-# 		npix= npixs[i],
-# 		distance_pc= 140.0,
-# 		wavelengths_mm= [wles_obs[i]],
-# 		views= views,
-# 		subbox=[ f'sink_{id :04d}'],
-# 		fov_au= box_fov,     	# diameter
-# 		polaris_binary= '/home/PERSONALE/gabriele.columba/POLARIS/bin/polaris',
-# 		#cleanup_views= True	# ??? 
-# 	)
+	pipe.render_images(
+		dust_mixtures= dustmix,
+		npix= npixs[i],
+		distance_pc= 140.0,
+		wavelengths_mm= [wles_obs[i]],
+		views= views,
+		subbox=[ f'sink_{id :04d}'],
+		label= f'{wles_obs[i] :1.0f}mm', 	# simple lambda label like "1mm"
+		fov_au= box_fov[i],     		# diameter
+		polaris_binary= '/home/PERSONALE/gabriele.columba/POLARIS/bin/polaris',
+		write_midplanes= False,
+		polaris_cmd = 'CMD_DUST_EMISSION',
+		cleanup_views= True	# ??? 
+	)
 	
-pipe.render_images(
-	dust_mixtures= dustmix,
-	npix= npixs[0],
-	distance_pc= 140.0,
-	wavelengths_mm= [wles_obs[0]],
-	views= views,
-	subbox=[ f'sink_{id :04d}'],
-	fov_au= box_fov[0],     	# diameter
-	polaris_binary= '/home/PERSONALE/gabriele.columba/POLARIS/bin/polaris',
-	write_midplanes= False,
-	# cleanup_views= True	# ??? 
-)
 
 
 quantity = 'intensity'
