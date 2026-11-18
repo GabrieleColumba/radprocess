@@ -265,7 +265,7 @@ class Sim(StrictDataclass):
         metadata={'desc': r'[AU] Size of the central hole to exctrude around the sinks.'})
     dtogas: float = field(default=0.01, 
         metadata={'desc': r'Dust-to-gas mass ratio. Used only if this is not multi-grain mode or if no dust ratios exist in RAMSES output.'})
-    arb_dtogas: list = field(default=[0.01], 
+    arb_dtogas: list = field(default_factory=list, 
         metadata={'desc': r'ARBITRARY dust-to-gas mass ratio(s). Used only when multi-grain=True and no dust exists in RAMSES output.'})
     facc: float = field(default=0.1, 
         metadata={'desc': r' Accretion fraction converted into radiation. Change at your own risk!'})
