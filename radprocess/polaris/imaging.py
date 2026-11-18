@@ -216,6 +216,8 @@ def write_imaging_cmd(
         if peel_off:
             f.write("\n\t<peel_off> 1\n")
 
+        f.write("\n\t<max_subpixel_lvl> 4\n")      # POLARIS default: 3
+
         if acceptance_angle is not None:
             f.write(f"\n\t<acc_sca> {acceptance_angle}\n")
 
