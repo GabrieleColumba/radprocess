@@ -1109,6 +1109,7 @@ class Pipeline:
         polaris_binary = None,
         cleanup_views = True,
         polaris_cmd = None,
+        write_midplanes = True, 
         alignment = None,
         peel_off = None,
         acceptance_angle = None,
@@ -1161,6 +1162,8 @@ class Pipeline:
             Remove previous image outputs (per-call).
         polaris_cmd : str or None
             POLARIS command. If None, configparams.imaging.polaris_cmd.
+        write_midplanes : bool
+            Write midplane slices to fits files (memory expensive). Default True.
         alignment : str or None
             Grain alignment mechanism. If None, configparams.imaging.alignment.
         peel_off : bool or None
@@ -1280,6 +1283,7 @@ class Pipeline:
                 label = label,
                 cleanup_views = cleanup_views,
                 polaris_cmd = polaris_cmd,
+                write_midplanes = write_midplanes, 
                 alignment = alignment,
                 peel_off = peel_off,
                 acceptance_angle = acceptance_angle,
@@ -1381,6 +1385,7 @@ class Pipeline:
                 label = label,
                 cleanup_views = cleanup_views,
                 polaris_cmd = polaris_cmd,
+                write_midplanes = write_midplanes, 
                 alignment = alignment,
                 peel_off = peel_off,
                 acceptance_angle = acceptance_angle,

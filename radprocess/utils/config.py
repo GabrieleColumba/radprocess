@@ -265,6 +265,8 @@ class Sim(StrictDataclass):
         metadata={'desc': r'[AU] Size of the central hole to exctrude around the sinks.'})
     dtogas: float = field(default=0.01, 
         metadata={'desc': r'Dust-to-gas mass ratio. Used only if this is not multi-grain mode or if no dust ratios exist in RAMSES output.'})
+    arb_dtogas: list = field(default_factory=list, 
+        metadata={'desc': r'ARBITRARY dust-to-gas mass ratio(s). Used only when multi-grain=True and no dust exists in RAMSES output.'})
     facc: float = field(default=0.1, 
         metadata={'desc': r' Accretion fraction converted into radiation. Change at your own risk!'})
     use_ramses_T: bool = field(default=True, 
@@ -320,7 +322,7 @@ class DustConfig(StrictDataclass):
     # NOTE: default was inconsistent in the old code (1.0 in run_opacity vs 0.01 in
     # the wrapper). Consolidated to the ISM-conventional dust-to-gas ratio 0.01.
     # Change here if your setup expects a different value.
-    mass_fraction: float = field(default=1.,
+    mass_fraction: float = field(default=0.01,
         metadata={'desc': r'Total dust-to-gas mass fraction (written as POLARIS <mass_fraction>).'})
 
     def validate(self):

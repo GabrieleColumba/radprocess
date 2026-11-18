@@ -1,0 +1,235 @@
+# from https://radprocess.readthedocs.io/en/latest/subboxes.html running radprocess for subboxes
+
+from radprocess.pipeline.Pipeline import Pipeline
+from radprocess.plotting import plot
+import numpy as np
+
+
+id = 50
+wles_obs = [0.890, 3.0]		# [mm]
+npixs = [2420, 1630]		# number of pixels for each wavelength (to match Tung+24 pixelscales)
+main_beam = np.rad2deg( 1.13 * np.array( wles_obs)*1e-3 / 12	)		# [deg], main beam for ALMA 12m antenna
+box_fov = main_beam * 140 * 3600		# [AU], fov to match the main beam at 140 pc
+# box_fov = 1000  		# diameter of the subbox in AU
+views = ['xy']
+scat_phot = int(1e6)
+therm_phot = int(0.5e6)
+
+pipe = Pipeline()
+cfg = pipe.configparams          # a ConfigParams instance
+cfg.polaris.nr_threads = 28
+archive_prefix = '/scratch/astro/gabriele.columba/'
+cfg.dir.ramses_output = archive_prefix + 'ramses_data/output_01440/'
+cfg.dir.pipeline_output = archive_prefix + "results/validation/"
+cfg.imaging.nr_photons_scat = scat_phot
+cfg.radmc3d.nphot_scat = scat_phot
+
+
+def create_mixtures( nbin, a_min=1e-8, a_max=2e-3, fractions=[0.8, 0.1], slope=-3.5, components=['silicate_d03.nk'] ):
+	'''
+	Create a dictionary of dust mixtures with the desired nbin. 
+	fraction: list of mass fractions for each component in the mixture (same len as components).
+	components: list of different dust species opacities to be used in each mixtures. 
+	'''
+	mix = {}
+	a_grid = np.logspace( np.log10(a_min), np.log10(a_max), nbin + 1, endpoint=True, dtype=np.float32 )
+	comp_dir = '/scratch/astro/gabriele.columba/' 	# validation with tungs
+	# comp_dir = '/home/PERSONALE/gabriele.columba/POLARIS/input/dust_nk/'	# directory containing the dust components opacity files
+	
+	for i in range(nbin):		# iterate on mixtures
+		mix[i] = {}
+		for c in range(len(components)):		# iterate on components
+			mix[ i ][ c ] = {		
+				'path': comp_dir + components[c],
+				'distribution': 'plaw', 	# power-law size distribution
+				'fraction': fractions[c], 	# mass fraction 
+				'density': 0, 				# using the default density defined in the dust model file
+				'amin': a_grid[ i], 		# in [m]
+				'amax': a_grid[ i+1], 		# in [m]
+				'index': slope, 			# exponent of size distribution
+					}
+	return mix
+
+
+# Define the AMR fields you want to extract
+cfg.amrsource.rho = True
+cfg.amrsource.dustratios = False
+cfg.amrsource.vel = False       # velocity (optional)
+cfg.amrsource.p = True         # pressure (optional)
+cfg.amrsource.temp = True      # temperature (requires pressure)
+
+# Simulation parameters
+cfg.sim.size_hole_au = 3.0
+cfg.sim.facc = 0.1
+# cfg.sim.use_ramses_T = False
+cfg.sim.dtogas = 0.01			# dust to gas ratio (if multi-grain=False, maybe deprecable)
+cfg.nb_dust = 1		# number of dust species you want !
+
+# # Dust materials.    [either the refractive index tables (.nk files) or the cross-sections (*.dat files) in the POLARIS format]
+
+dustmix = create_mixtures( nbin=cfg.nb_dust, a_min=1e-9, a_max=1e-5, fractions=[1], slope=-3.5, 
+                          components=['DIANA-dhs_w16.dat'] )
+
+cfg.dust.mixtures = dustmix
+cfg.sim.arb_dtogas = [0.01]		# ratios for each dust species (only used if multi-grain=True and no dust exists in RAMSES output)
+# arb_dtogas must have same length as nb_dust !
+
+# Load RAMSES (Step 1, same as basic pipeline)
+pipe.load_ramses()      # CANNOT be skipped if injecting ad hoc dust bins !
+
+
+## Step 2: Extract subboxes
+# Extract subboxes around each sink in both POLARIS and RADMC-3D format:
+
+# POLARIS format
+pipe.convert_subboxes(
+	which_rad= "polaris",
+	box_half_width_au= box_fov.max()/2,    # ±500 AU around each sink
+	isolation_radius_au= 200,     	# skip sinks closer than 200 AU to a neighbour
+	min_cells= 1000,              	# select boxes with a minimum of cell numbers.
+	hole_au= cfg.sim.size_hole_au,	# dig hole around sink (this replaces the value set in the Simulation parameters)
+	sink_indices= [id-1],
+)
+
+# RADMC-3D format (same extraction, different output format)
+pipe.convert_subboxes(
+	which_rad="radmc",
+	box_half_width_au= box_fov.max()/2,
+	sink_indices= [id-1],
+)
+
+pipe.convert_to_polaris( )
+
+pipe.run_polaris_opacity( dust_mixtures=dustmix, mass_fraction=0.01 , n_dust_override=cfg.nb_dust )		# pipeline wrapper for run_opacity() in opacity.py
+
+pipe.prepare_radmc3d_inputs(
+	subbox= True,
+	nphot= therm_phot, 		# thermal 
+	nphot_scat= scat_phot,	# scattering	
+	n_wavelengths=200, 		# 200 default 
+	wave_min=0.1, 			# [µm] (match the dustkappa range)
+	wave_max=30e3, 			# [µm]
+	scattering_mode=1,  	# 0: no scattering, 1: isotropic, 2: anisotropic, 3: full scattering (no polarisation)
+	scattering_mode_max=1,
+	# modified_random_walk=True,	# BUG
+	setthreads=28,
+)
+
+pipe.run_radmc3d_mctherm( subbox=f'sink_{id :04d}' )
+
+pipe.merge_temperature( subbox=f'sink_{id :04d}' )
+
+
+# The fov_au parameter sets the field of view in AU. 
+# It should match the box_au used for the RADMC-3D regrid so that density and intensity maps are directly comparable. 
+# The image is automatically centered on the sink via the POLARIS detector shift.
+
+for i in range(len(wles_obs)):	# bisogna cambiare il nome dell'output polaris per ogni wavelength, altrimenti sovrascrive il file di output
+
+	pipe.render_images(
+		dust_mixtures= dustmix,
+		npix= npixs[i],
+		distance_pc= 140.0,
+		wavelengths_mm= [wles_obs[i]],
+		views= views,
+		subbox=[ f'sink_{id :04d}'],
+		label= f'{wles_obs[i] :1.0f}mm', 	# simple lambda label like "1mm"
+		fov_au= box_fov[i],     		# diameter
+		polaris_binary= '/home/PERSONALE/gabriele.columba/POLARIS/bin/polaris',
+		write_midplanes= False,
+		polaris_cmd = 'CMD_DUST_EMISSION',
+		cleanup_views= True	# ??? 
+	)
+	
+
+
+quantity = 'intensity'
+for view in views:
+
+	fig = plot.subbox_mosaic(
+		pipeline_output= cfg.dir.pipeline_output + "polaris/",
+		quantity= quantity,
+		view=view,
+		wavelength_idx=0,      # first wavelength
+		log=True,
+		cmap="inferno",
+		figsize=(6, 6),
+		fontsize=9,
+		sink_folders= [f'sink_{id :04d}'] #[f"sink_{id+1 :04d}" for id in sinks_IDs]
+	)
+
+	fig.savefig( cfg.dir.pipeline_output + f'{id}_{view}_{quantity}_ISO' + '.pdf', dpi=300, bbox_inches='tight')
+
+
+# fig = plot.subbox_mosaic(
+# 	cfg.dir.pipeline_output + "polaris/",
+# 	quantity= "intensity",
+# 	view="xy",
+# 	wavelength_idx=0,      # first wavelength
+# 	log=True,
+# 	cmap="inferno",
+#     fontsize=9,
+# )
+
+# fig.savefig( cfg.dir.pipeline_output + '57_I_xy' + '.pdf', dpi=200, bbox_inches='tight')
+
+
+# # Optical depth 
+# fig = plot.subbox_mosaic( cfg.dir.pipeline_output + "polaris/", quantity="tau", view="xy", log=False, wavelength_idx=0, cmap='turbo', fontsize=9, )
+
+# fig.savefig( cfg.dir.pipeline_output + '50_tau_xy' + '.pdf', dpi=200, bbox_inches='tight')
+
+
+
+
+
+
+
+# # Dust materials.    [either the refractive index tables (.nk files) or the cross-sections (*.dat files) in the POLARIS format]
+
+# dustmix_ex = {		# sacha example
+# 	0: { # mixture ID (1st mixture)
+# 		0: { # component ID (1st component)
+# 			'path': '/home/PERSONALE/gabriele.columba/POLARIS/input/dust_nk/silicate_d03.nk',
+# 			'distribution': 'plaw', # power-law size distribution
+# 			'fraction': .8, 	# 60% mass fraction of 1st mixture
+# 			'density': 0, 		# using the default density defined in the dust model file
+# 			'amin': 1.0e-08, 	# in m
+# 			'amax': 1.0e-04, 	# in m
+# 			'index': -3.5 		# MRN
+# 		},
+# 		1 :{ # component ID (2nd component)
+# 			'path': '/home/PERSONALE/gabriele.columba/POLARIS/input/dust_nk/organics_p94.nk',
+# 			'distribution': 'plaw', # MUST be the same for all components within a single mixture
+# 			'fraction': 0.4, # 40% mass fraction of 1st mixture (the total should be 1)
+# 			'density': 0,
+# 			'amin': 5.0e-08,
+# 			'amax': 5.0e-06,
+# 			'index': -3.0
+# 		}
+# 	},
+# 	1: { # mixture ID (only if the number of dust density distribution columns is greater than 1)
+# 		0: { # component ID (a single component)
+# 			'path': '/home/PERSONALE/gabriele.columba/POLARIS/input/dust_nk/silicate_d03.nk',
+# 			'distribution': 'logn', # log-normal size distribution
+# 			'fraction': 1.0, # 100% mass fraction of 2nd mixture
+# 			'density': 3300, # kg/m^3
+# 			'amin': 1.0e-08,
+# 			'amax': 1.0e-06,
+# 			'index': [1.0e-07, 0.5]
+# 		}
+# 	}
+# }
+
+# dustmix = {		# sacha example
+# 	0: { # mixture ID (1st mixture)
+# 		0: { # component ID (1st component)
+# 			'path': '/home/PERSONALE/gabriele.columba/POLARIS/input/dust_nk/silicate_d03.nk',
+# 			'distribution': 'plaw', # power-law size distribution
+# 			'fraction': .8, 	# 60% mass fraction of 1st mixture
+# 			'density': 0, 		# using the default density defined in the dust model file
+# 			'amin': 1.0e-08, 	# in m
+# 			'amax': 1.0e-04, 	# in m
+# 			'index': -3.5 		# MRN
+# 		},
+# },}
