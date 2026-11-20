@@ -1101,6 +1101,7 @@ class Pipeline:
         label="whole",
         radmc3d_binary="radmc3d",
         subbox=None,
+        secondorder=False,
     ):
         """Render RADMC-3D continuum images after ``run_radmc3d_mctherm``.
 
@@ -1140,7 +1141,7 @@ class Pipeline:
                 radmc_dir=model_dir, image_output_dir=output_dir,
                 npix=npix, wavelengths_mm=wavelengths_mm, views=views,
                 custom_views=img.custom_views, fov_au=width_au,
-                point_au=point_au, radmc3d_binary=radmc3d_binary, label=label,
+                point_au=point_au, radmc3d_binary=radmc3d_binary, label=label, secondorder=secondorder
             )
 
         if subbox is None:

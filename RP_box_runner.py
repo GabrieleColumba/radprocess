@@ -132,6 +132,7 @@ im_dirs = pipe.render_radmc3d_images(
 			fov_au= box_fov[i],     		# diameter
 			label= f'{wles_obs[i] :1.0f}mm', 	# simple lambda label like "1mm"
 			subbox=[ f'sink_{id :04d}'],
+			secondorder=True,		# second order interpolation for the image rendering
 		)
 
 from radprocess.radmc3d.imaging import image_to_fits
@@ -139,7 +140,7 @@ from radprocess.radmc3d.imaging import image_to_fits
 #radmc_out_path = cfg.pipeline	 # im_dirs[ views[i] ]
 radmc_out_path = cfg.dir.pipeline_output + f'radmc3d/images/subboxes/sink_{id :04d}/{wles_obs[i] :1.0f}mm/{views[i]}/image.out'
 
-image_to_fits( image_path=radmc_out_path, distance_pc=140, fits_path='d50_test.fits', coord="03h10m05s -10d05m30s")
+image_to_fits( image_path=radmc_out_path, distance_pc=140, fits_path='d50_test_2nd.fits', coord="03h10m05s -10d05m30s")
 
 
 for i in range(len(wles_obs)):	# bisogna cambiare il nome dell'output polaris per ogni wavelength, altrimenti sovrascrive il file di output

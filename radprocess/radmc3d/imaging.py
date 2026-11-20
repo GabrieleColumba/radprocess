@@ -81,7 +81,7 @@ def _camera_angles(geometry):
 
 def render_images( radmc_dir, image_output_dir, npix, wavelengths_mm, views,
                   custom_views=None, fov_au=None, point_au=None,
-                  radmc3d_binary="radmc3d", label="whole"):
+                  radmc3d_binary="radmc3d", label="whole", secondorder=False):
     """Render a multi-wavelength RADMC-3D image for each requested view.
 
     Returns a mapping from view names to directories containing RADMC-3D's
@@ -170,6 +170,8 @@ def render_images( radmc_dir, image_output_dir, npix, wavelengths_mm, views,
                 command += ["sizeau", str(fov_au)]
             if point_au is not None:
                 command += ["pointau", *(str(x) for x in point_au)]
+            if secondorder == True:
+                command += ["secondorder"]
             
             result = subprocess.run(command, cwd=work, stdout=subprocess.PIPE,
                                     stderr=subprocess.STDOUT, text=True, encoding="utf-8")
