@@ -1091,6 +1091,92 @@ class Pipeline:
 
         return results
 
+
+    def render_radmc3d_images(
+        self,
+        npix=None,
+        wavelengths_mm=None,
+        views=None,
+        fov_au=None,
+        label="whole",
+        radmc3d_binary="radmc3d",
+        subbox=None,
+    ):
+        """Render RADMC-3D continuum images after ``run_radmc3d_mctherm``.
+
+        Observation settings default to ``configparams.imaging`` as in
+        ``render_images``. The output is native RADMC-3D specific intensity,
+        not POLARIS FITS; distance is not needed to compute it. Custom views
+        use the same image-frame definitions as POLARIS.
+
+        For subboxes, ``subbox`` accepts a sink name, a list, or ``"all"``.
+        The saved sink offset centers the camera, and the requested extraction
+        width is used when no field of view is provided. Returns the same
+        view-to-directory mapping as ``render_images``, nested by sink for
+        multiple subboxes.
+        """
+        from radprocess.constants.constants import au2cm, au2m
+        from radprocess.radmc3d.imaging import render_images
+
+        img = self.configparams.imaging
+        npix = _resolve(npix, img.npix)
+        wavelengths_mm = _resolve(wavelengths_mm, img.wavelengths_mm)
+        views = _resolve(views, img.views)
+        fov_au = _resolve(fov_au, img.fov_au)
+
+        radmc_dir = self.radmc_outputs_dir
+
+        def render_one(model_dir, output_dir, subbox_mode=False):
+            point_au = None
+            width_au = fov_au
+            if subbox_mode:
+                offset_file = model_dir / "sink_offset.txt"
+                if offset_file.exists():
+                    point_au = np.loadtxt(offset_file) / au2cm
+                fov_file = model_dir / "requested_hw_au.txt"
+                if width_au is None and fov_file.exists():
+                    width_au = 2.0 * float(np.loadtxt(fov_file))
+            return render_images(
+                radmc_dir=model_dir, image_output_dir=output_dir,
+                npix=npix, wavelengths_mm=wavelengths_mm, views=views,
+                custom_views=img.custom_views, fov_au=width_au,
+                point_au=point_au, radmc3d_binary=radmc3d_binary, label=label,
+            )
+
+        if subbox is None:
+            return render_one(radmc_dir, radmc_dir / "images")
+
+        base = radmc_dir / "subboxes"
+        if not base.is_dir():
+            raise FileNotFoundError(f"RADMC-3D subbox directory not found: {base}")
+        if subbox == "all":
+            names = sorted(
+                d.name for d in base.iterdir()
+                if d.is_dir() and d.name.startswith("sink_")
+                and ((d / "dust_temperature.dat").is_file()
+                     or (d / "dust_temperature.bdat").is_file())
+            )
+        elif isinstance(subbox, str):
+            names = [subbox]
+        elif isinstance(subbox, list):
+            names = subbox
+        else:
+            raise ValueError("subbox must be None, 'all', a string, or a list of strings.")
+        if not names:
+            raise RuntimeError("No subboxes with RADMC-3D temperatures found.")
+        results = {}
+        for name in names:
+            if not isinstance(name, str) or not name.startswith("sink_") or Path(name).name != name:
+                raise ValueError(f"Invalid subbox name: {name!r}")
+            model_dir = base / name
+            if not model_dir.is_dir():
+                raise FileNotFoundError(f"RADMC-3D subbox not found: {model_dir}")
+            results[name] = render_one(model_dir, radmc_dir / "images" / "subboxes" / name, True)
+        if isinstance(subbox, str) and subbox != "all":
+            return results[subbox]
+        return results
+
+
     def render_images(
         self,
         dust_mixtures = None,

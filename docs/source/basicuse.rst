@@ -263,6 +263,60 @@ increase the midplane zoom:
 
 Images are written to ``{working_dir}/images/{label}/{view}/``.
 
+Alternative: RADMC-3D imaging
+------------------------------
+
+After Step 6, render the RADMC-3D thermal solution directly, without merging
+temperatures into POLARIS:
+
+.. code-block:: python
+
+    images = pipe.render_radmc3d_images(
+        npix=512,
+        wavelengths_mm=[0.87, 1.3, 3.0],
+        views=["xy", "xz", "yz"],
+        fov_au=1000,
+        radmc3d_binary="radmc3d",
+    )
+
+Omitted observation settings use ``pipe.configparams.imaging``, including
+custom views. ``fov_au`` is the full image width; alternatively use ``fov_m``.
+For subboxes, pass ``subbox="sink_0026"``, a list of sink names, or
+``subbox="all"``. Images are centered on each sink and default to the
+requested extraction width. The return value maps view names to output
+directories (nested by sink for a list or ``"all"``).
+
+Each directory under ``radmc3d/images/`` contains a native RADMC-3D
+``image.out`` (or ``image.bout``) with all requested wavelengths and a
+``render.log``. These are specific-intensity images, not POLARIS FITS files;
+distance-dependent flux conversion and POLARIS plotting/analysis are not
+performed. RADMC-3D uses the orientation-averaged opacities produced by Step 5,
+so its images are not equivalent to POLARIS aligned-grain polarization maps.
+The existing ``render_images`` method continues to use POLARIS.
+
+To convert a RADMC-3D ASCII image to FITS, use the optional ``radmc3dPy``
+package in the same Python environment:
+
+.. code-block:: python
+
+    from radprocess.radmc3d.imaging import image_to_fits
+
+    fits_file = image_to_fits(
+        images["xy"] / "image.out",
+        distance_pc=140.0,
+        coord="03h10m05s -10d05m30s",  # replace with the image center in ICRS
+        wavelength_index=0,
+    )
+
+The FITS file contains a 2D Stokes I image in Jy/pixel and sky coordinates,
+pixel scale, frequency, wavelength in microns (``WAVELEN``), and distance in
+parsecs (``DIST_PC``) in its header. The specified sky position is assigned
+to the image center; it is not inferred from the simulation. No beam
+convolution is applied. For multi-wavelength images, select a zero-based
+``wavelength_index`` and use a distinct ``fits_path`` for each wavelength;
+existing FITS files are not overwritten. For a single wavelength the index
+can be omitted.
+
 
 Complete example
 ================

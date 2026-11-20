@@ -3,6 +3,7 @@
 from radprocess.pipeline.Pipeline import Pipeline
 from radprocess.plotting import plot
 import numpy as np
+import local_variables as lv
 
 
 id = 50
@@ -12,15 +13,15 @@ main_beam = np.rad2deg( 1.13 * np.array( wles_obs)*1e-3 / 12	)		# [deg], main be
 box_fov = main_beam * 140 * 3600		# [AU], fov to match the main beam at 140 pc
 # box_fov = 1000  		# diameter of the subbox in AU
 views = ['xy']
-scat_phot = int(1e6)
-therm_phot = int(0.5e6)
+scat_phot = int(.01e6)
+therm_phot = int(0.05e6)
 
 pipe = Pipeline()
 cfg = pipe.configparams          # a ConfigParams instance
-cfg.polaris.nr_threads = 28
-archive_prefix = '/scratch/astro/gabriele.columba/'
-cfg.dir.ramses_output = archive_prefix + 'ramses_data/output_01440/'
-cfg.dir.pipeline_output = archive_prefix + "results/validation/"
+cfg.polaris.nr_threads = lv.nThreads
+# archive_prefix = '/scratch/astro/gabriele.columba/'
+cfg.dir.ramses_output = lv.data_prefix + 'output_01440/'
+cfg.dir.pipeline_output = lv.resultsdir_prefix + 'validation/'
 cfg.imaging.nr_photons_scat = scat_phot
 cfg.radmc3d.nphot_scat = scat_phot
 
@@ -33,14 +34,13 @@ def create_mixtures( nbin, a_min=1e-8, a_max=2e-3, fractions=[0.8, 0.1], slope=-
 	'''
 	mix = {}
 	a_grid = np.logspace( np.log10(a_min), np.log10(a_max), nbin + 1, endpoint=True, dtype=np.float32 )
-	comp_dir = '/scratch/astro/gabriele.columba/' 	# validation with tungs
 	# comp_dir = '/home/PERSONALE/gabriele.columba/POLARIS/input/dust_nk/'	# directory containing the dust components opacity files
 	
 	for i in range(nbin):		# iterate on mixtures
 		mix[i] = {}
 		for c in range(len(components)):		# iterate on components
 			mix[ i ][ c ] = {		
-				'path': comp_dir + components[c],
+				'path': lv.comp_dir + components[c],	# path to the dust component opacity file + name of component
 				'distribution': 'plaw', 	# power-law size distribution
 				'fraction': fractions[c], 	# mass fraction 
 				'density': 0, 				# using the default density defined in the dust model file
@@ -59,7 +59,7 @@ cfg.amrsource.p = True         # pressure (optional)
 cfg.amrsource.temp = True      # temperature (requires pressure)
 
 # Simulation parameters
-cfg.sim.size_hole_au = 3.0
+cfg.sim.size_hole_au = 4.0
 cfg.sim.facc = 0.1
 # cfg.sim.use_ramses_T = False
 cfg.sim.dtogas = 0.01			# dust to gas ratio (if multi-grain=False, maybe deprecable)
@@ -75,6 +75,7 @@ cfg.sim.arb_dtogas = [0.01]		# ratios for each dust species (only used if multi-
 # arb_dtogas must have same length as nb_dust !
 
 # Load RAMSES (Step 1, same as basic pipeline)
+# pipe.set_pymsesrc()		# the first time we use different ramses data (for fields extraction)
 pipe.load_ramses()      # CANNOT be skipped if injecting ad hoc dust bins !
 
 
@@ -112,17 +113,34 @@ pipe.prepare_radmc3d_inputs(
 	scattering_mode=1,  	# 0: no scattering, 1: isotropic, 2: anisotropic, 3: full scattering (no polarisation)
 	scattering_mode_max=1,
 	# modified_random_walk=True,	# BUG
-	setthreads=28,
+	setthreads=lv.nThreads,
 )
 
 pipe.run_radmc3d_mctherm( subbox=f'sink_{id :04d}' )
 
-pipe.merge_temperature( subbox=f'sink_{id :04d}' )
+pipe.merge_temperature( subbox=f'sink_{id :04d}' )		# can be skipped if you render with RADMC3D
 
 
 # The fov_au parameter sets the field of view in AU. 
 # It should match the box_au used for the RADMC-3D regrid so that density and intensity maps are directly comparable. 
 # The image is automatically centered on the sink via the POLARIS detector shift.
+i = 0
+im_dirs = pipe.render_radmc3d_images(
+			npix= npixs[i],
+			wavelengths_mm= [wles_obs[i]],
+			views= views, 
+			fov_au= box_fov[i],     		# diameter
+			label= f'{wles_obs[i] :1.0f}mm', 	# simple lambda label like "1mm"
+			subbox=[ f'sink_{id :04d}'],
+		)
+
+from radprocess.radmc3d.imaging import image_to_fits
+
+#radmc_out_path = cfg.pipeline	 # im_dirs[ views[i] ]
+radmc_out_path = cfg.dir.pipeline_output + f'radmc3d/images/subboxes/sink_{id :04d}/{wles_obs[i] :1.0f}mm/{views[i]}/image.out'
+
+image_to_fits( image_path=radmc_out_path, distance_pc=140, fits_path='d50_test.fits', coord="03h10m05s -10d05m30s")
+
 
 for i in range(len(wles_obs)):	# bisogna cambiare il nome dell'output polaris per ogni wavelength, altrimenti sovrascrive il file di output
 
@@ -135,7 +153,7 @@ for i in range(len(wles_obs)):	# bisogna cambiare il nome dell'output polaris pe
 		subbox=[ f'sink_{id :04d}'],
 		label= f'{wles_obs[i] :1.0f}mm', 	# simple lambda label like "1mm"
 		fov_au= box_fov[i],     		# diameter
-		polaris_binary= '/home/PERSONALE/gabriele.columba/POLARIS/bin/polaris',
+		polaris_binary= lv.polaris_binary,
 		write_midplanes= False,
 		polaris_cmd = 'CMD_DUST_EMISSION',
 		cleanup_views= True	# ??? 
